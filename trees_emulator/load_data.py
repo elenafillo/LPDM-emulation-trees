@@ -155,9 +155,14 @@ def generate_wind_vectors(windspeed, winddir):
     return y_wind, x_wind
 
 def get_past_values(met_var, jump):
-    ## returns an np array of shape (n_samples-jump, 2*metsize**2). Second dimension is concatenation of [variable at fp time (size metsize**2), variable #jump hours before (size metsize**2)]
-    ## takes as inputs a variable (as a np array of shape (metsize, metsize, n_samples)) and a "jump" in hours as an int
-    ## eg get_past_values(data.u_wind, 6) will return the u_wind at the time of the footprint and six hours before
+    """
+    Concatenate a variable and its past.
+
+    Returns an np array of shape (n_samples-jump, 2*metsize**2). 
+    Second dimension is concatenation of [variable at fp time (size metsize**2), variable #jump hours before (size metsize**2)].
+    Takes as inputs a variable (as a np array of shape (metsize, metsize, n_samples)) and a "jump" in hours as an int
+    eg get_past_values(data.u_wind, 6) will return the u_wind at the time of the footprint and six hours before.
+    """
     met_var = np.transpose(met_var, [2,0,1])
     met_var = np.reshape(met_var, (np.shape(met_var)[0], np.shape(met_var)[1]**2))
 
@@ -165,10 +170,13 @@ def get_past_values(met_var, jump):
 
 
 def get_all_inputs(variables_past, jump, variables_nopast):
-    ## returns all input variables stacked and ready to pass to regressors, with shape (n_samples-jump-3, (2*#variables_past+#variables_nopast)**2)
-    ## takes a list of variables that are passed at time of footprint and #jump hours before (in paper these are x_wind, y_wind, PBLH with jump=6)
-    ##  and a list of variables that are passed only at time of footprint. 
-    ## Last three items of all variables are removed, due to interpolation setup 
+    """
+    Returns all input variables stacked and ready to pass to regressors, with shape (n_samples-jump-3, (2*#variables_past+#variables_nopast)**2)
+
+    Takes a list of variables that are passed at time of footprint and #jump hours before (in paper these are x_wind, y_wind, PBLH with jump=6)
+    and a list of variables that are passed only at time of footprint. 
+    Last three items of all variables are removed, due to interpolation setup.
+    """
     all_vars = []
     for v in variables_past:
         all_vars.append(get_past_values(v, jump)[:-3, :])
