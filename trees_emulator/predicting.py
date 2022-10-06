@@ -2,8 +2,14 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
-from matplotlib.ticker import MaxNLocator
-
+from datetime import datetime
+import cartopy
+from cartopy.mpl.ticker import LongitudeFormatter, LatitudeFormatter
+import matplotlib.ticker as mticker
+import shapely
+import warnings
+from shapely.errors import ShapelyDeprecationWarning
+warnings.filterwarnings("ignore", category=ShapelyDeprecationWarning) 
 
 class MakePredictions:
     """
@@ -85,20 +91,26 @@ class MakePredictions:
 
 
 
-def plot_flux(MakePredictions, LoadData, month):
+def plot_flux(MakePredictions, LoadData, month, year=None):
     """
     Plot mole fraction from LPDM footprints and emulated footprints for a particular month.
 
     Takes as inputs a MakePredictions object that has attributes true_flux and pred_flux (ie predict_fluxes has been run),
-    a LoadData object and the month to plot, as an integer (January is 1, February 2 etc).
+    a LoadData object and the month and year to plot, as an integer (January is 1, February 2 etc and 2015, 2016 etc). The year is not necessary if the LoadData object contains only one year.
 
     """
     fig, axis = plt.subplots(1,1,figsize = (15,4))
 
     fontsizes = {"title":17, "labels": 15, "axis":10}
 
+    if year==None:
+        if type(LoadData.year) == int:
+            year = LoadData.year
+        else:
+            print("No year was passed but the LoadData object comprises more than one year. Please pass a year.")
 
-    month = np.argwhere(pd.DatetimeIndex(LoadData.met.time.values[MakePredictions.jump:-3]).month == month)
+    month = np.argwhere((pd.DatetimeIndex(LoadData.met.time.values[MakePredictions.jump:-3]).month == month) & (pd.DatetimeIndex(LoadData.met.time.values[MakePredictions.jump:-3]).year == year))
+    assert len(month) > 0, "It seems there is no data in the LoadData object for this month and year."
     dates = pd.DatetimeIndex(LoadData.met.time.values[MakePredictions.jump:-3][month])
     month_idxs = [month[0][0],month[-1][0]+1]
     
@@ -121,7 +133,62 @@ def plot_flux(MakePredictions, LoadData, month):
 
     axis.legend()
 
+    plt.show()
 
+def plot_footprint(MakePredictions, LoadData, date):
+
+    if type(date) == str:
+        try:
+            date = datetime.strptime(date, "%H:00 %d/%m/%Y")
+        except:
+            print("Something was wrong with the date. Please pass it in format hour:00 day/month/year (eg 15:00 1/3/2016)")
+        
+        idx = pd.DatetimeIndex(LoadData.met.time.values[MakePredictions.jump:-3]).get_loc(date)
+
+    if type(date) == int:
+        idx = date
+        date = pd.DatetimeIndex(LoadData.met.time.values[MakePredictions.jump:-3])[idx]
+
+    #print(date, idx, type(date), type(idx))
+    fig, (axr, axp) = plt.subplots(1,2,figsize = (15,15), subplot_kw={'projection':cartopy.crs.Mercator()})
+    
+    axr.pcolormesh(LoadData.fp_lons, LoadData.fp_lats, np.reshape(MakePredictions.truths[idx,:], (10,10)), transform=cartopy.crs.PlateCarree(), cmap="Reds", vmax = np.nanmax(MakePredictions.truths[idx,:]), vmin=0)
+    c = axp.pcolormesh(LoadData.fp_lons, LoadData.fp_lats, np.reshape(MakePredictions.predictions[idx,:], (10,10)), transform=cartopy.crs.PlateCarree(), cmap="Reds", vmax = np.nanmax(MakePredictions.truths[idx,:]), vmin=0)
+
+
+
+    for ax in [axr, axp]:
+        ax.set_extent([LoadData.fp_lons[0]-0.1,LoadData.fp_lons[-1]+0.1, LoadData.fp_lats[0]+0.1,LoadData.fp_lats[-1]+0.1], crs=cartopy.crs.PlateCarree())
+        ax.set_xticks(LoadData.fp_lons[::3], crs=cartopy.crs.PlateCarree())
+    
+        lon_formatter = LongitudeFormatter(number_format='.1f', degree_symbol='', dateline_direction_label=True)
+        ax.xaxis.set_major_formatter(lon_formatter)  
+        ax.set_yticks(LoadData.fp_lats[::3], crs=cartopy.crs.PlateCarree())
+        lat_formatter = LatitudeFormatter(number_format='.1f',  degree_symbol='',)
+        ax.yaxis.set_major_formatter(lat_formatter)             
+        ax.tick_params(axis='both', which='major', labelsize=12)   
+
+        ax.plot(LoadData.release_lon+0, LoadData.release_lat+0, marker='o', c="w", markeredgecolor = "k", transform=cartopy.crs.PlateCarree(), markersize=5)
+
+        ax.coastlines(resolution='50m', color='black', linewidth=2)
+
+        
+
+        
+    
+    axr.set_title("LPDM-generated footprint - "+ LoadData.site + "\n" + date.strftime("%m/%d/%Y, %H:00"), fontsize = 17)
+    axp.set_title("Emulator-generated footprint - "+ LoadData.site + "\n" + date.strftime("%m/%d/%Y, %H:00"), fontsize = 17)
+
+
+    #gl = axr.gridlines(draw_labels=False)
+    #gl.xlocator(mticker.FixedLocator(LoadData.fp_lons))
+    #gl.xformatter = LongitudeFormatter()
+
+    cbar = plt.colorbar(c, ax=[axr, axp], orientation="vertical", shrink = 0.25, aspect = 15, pad = 0.02)
+    cbar.ax.tick_params(labelsize=11)
+    cbar.set_label("sensitivity, (mol/mol)/(mol/m2/s)", size = 15, loc="center", labelpad = 16) 
+
+    fig.show()
 
 
 
