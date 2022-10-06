@@ -10,6 +10,8 @@ import shapely
 import warnings
 from shapely.errors import ShapelyDeprecationWarning
 warnings.filterwarnings("ignore", category=ShapelyDeprecationWarning) 
+import imageio
+import os
 
 class MakePredictions:
     """
@@ -135,28 +137,44 @@ def plot_flux(MakePredictions, LoadData, month, year=None):
 
     plt.show()
 
-def plot_footprint(MakePredictions, LoadData, date):
+def plot_footprint(MakePredictions, LoadData, date, fixed_cbar = False):
+    """
+    Plot footprints (real and predicted side-by-side).
 
+    Takes as inputs a MakePredictions object, a LoadData object and the date to plot (as a string in format hour:00 day/month/year (eg 15:00 1/3/2016) or as an data index as an int).
+    """
+    ## check that date is within range, and get index from date (or viceversa)
     if type(date) == str:
         try:
             date = datetime.strptime(date, "%H:00 %d/%m/%Y")
         except:
             print("Something was wrong with the date. Please pass it in format hour:00 day/month/year (eg 15:00 1/3/2016)")
         
-        idx = pd.DatetimeIndex(LoadData.met.time.values[MakePredictions.jump:-3]).get_loc(date)
+        try:
+            idx = pd.DatetimeIndex(LoadData.met.time.values[MakePredictions.jump:-3]).get_loc(date)
+        except:
+            raise KeyError("This date is out of range")
 
     if type(date) == int:
         idx = date
-        date = pd.DatetimeIndex(LoadData.met.time.values[MakePredictions.jump:-3])[idx]
+        try:
+            date = pd.DatetimeIndex(LoadData.met.time.values[MakePredictions.jump:-3])[idx]
+        except:
+            raise KeyError("This index is out of range")
 
-    #print(date, idx, type(date), type(idx))
-    fig, (axr, axp) = plt.subplots(1,2,figsize = (15,15), subplot_kw={'projection':cartopy.crs.Mercator()})
+    ## create figure and plot
+    fig, (axr, axp) = plt.subplots(1,2,figsize = (15,7), subplot_kw={'projection':cartopy.crs.Mercator()})
+
+    if fixed_cbar==False:
+        vmax = np.nanmax(MakePredictions.truths[idx,:])
+    else:
+        vmax = fixed_cbar
     
-    axr.pcolormesh(LoadData.fp_lons, LoadData.fp_lats, np.reshape(MakePredictions.truths[idx,:], (10,10)), transform=cartopy.crs.PlateCarree(), cmap="Reds", vmax = np.nanmax(MakePredictions.truths[idx,:]), vmin=0)
-    c = axp.pcolormesh(LoadData.fp_lons, LoadData.fp_lats, np.reshape(MakePredictions.predictions[idx,:], (10,10)), transform=cartopy.crs.PlateCarree(), cmap="Reds", vmax = np.nanmax(MakePredictions.truths[idx,:]), vmin=0)
+    axr.pcolormesh(LoadData.fp_lons, LoadData.fp_lats, np.reshape(MakePredictions.truths[idx,:], (10,10)), transform=cartopy.crs.PlateCarree(), cmap="Reds", vmax = vmax, vmin=0)
+    c = axp.pcolormesh(LoadData.fp_lons, LoadData.fp_lats, np.reshape(MakePredictions.predictions[idx,:], (10,10)), transform=cartopy.crs.PlateCarree(), cmap="Reds", vmax = vmax, vmin=0)
 
 
-
+    ## set up axis
     for ax in [axr, axp]:
         ax.set_extent([LoadData.fp_lons[0]-0.1,LoadData.fp_lons[-1]+0.1, LoadData.fp_lats[0]+0.1,LoadData.fp_lats[-1]+0.1], crs=cartopy.crs.PlateCarree())
         ax.set_xticks(LoadData.fp_lons[::3], crs=cartopy.crs.PlateCarree())
@@ -172,23 +190,77 @@ def plot_footprint(MakePredictions, LoadData, date):
 
         ax.coastlines(resolution='50m', color='black', linewidth=2)
 
-        
-
-        
     
     axr.set_title("LPDM-generated footprint - "+ LoadData.site + "\n" + date.strftime("%m/%d/%Y, %H:00"), fontsize = 17)
     axp.set_title("Emulator-generated footprint - "+ LoadData.site + "\n" + date.strftime("%m/%d/%Y, %H:00"), fontsize = 17)
 
-
-    #gl = axr.gridlines(draw_labels=False)
-    #gl.xlocator(mticker.FixedLocator(LoadData.fp_lons))
-    #gl.xformatter = LongitudeFormatter()
-
-    cbar = plt.colorbar(c, ax=[axr, axp], orientation="vertical", shrink = 0.25, aspect = 15, pad = 0.02)
+    ## set up cbar
+    cbar = plt.colorbar(c, ax=[axr, axp], orientation="vertical", aspect = 15, pad = 0.02)
     cbar.ax.tick_params(labelsize=11)
     cbar.set_label("sensitivity, (mol/mol)/(mol/m2/s)", size = 15, loc="center", labelpad = 16) 
 
     fig.show()
 
 
+def make_footprint_gif(MakePredictions, LoadData, start_date, end_date, savepath=None):
+    """
+    Make gif of footprints (real and predicted side-by-side) for a range of dates.
 
+    Takes as inputs a MakePredictions object, a LoadData object, the start and end date (as strings in format hour:00 day/month/year (eg 15:00 1/3/2016) or as integers), and an optional saving directory. Otherwise gif is saved in local directory under the name footprints_startdate_enddate.gif.
+
+    """
+    
+    ## check that date is within range, and get index from date (or viceversa)
+    if type(start_date) == str and type(end_date) == str:
+        try:
+            start_date = datetime.strptime(start_date, "%H:00 %d/%m/%Y")
+            end_date = datetime.strptime(end_date, "%H:00 %d/%m/%Y")
+        except:
+            print("Something was wrong with the date. Please pass it in format hour:00 day/month/year (eg 15:00 1/3/2016)")
+        
+        try:
+            start_idx = pd.DatetimeIndex(LoadData.met.time.values[MakePredictions.jump:-3]).get_loc(start_date)
+            end_idx = pd.DatetimeIndex(LoadData.met.time.values[MakePredictions.jump:-3]).get_loc(end_date)
+        except KeyError:
+            raise KeyError("One of the dates is out of range")
+
+        assert start_idx<end_idx, "Start date should be before end date"
+
+    if type(start_date) == int and type(end_date) == int:
+        start_idx, end_idx = start_date, end_date 
+        assert start_idx<end_idx, "Start date should be before end date"
+        try:
+            start_date = pd.DatetimeIndex(LoadData.met.time.values[MakePredictions.jump:-3])[start_idx]
+            end_date = pd.DatetimeIndex(LoadData.met.time.values[MakePredictions.jump:-3])[end_idx]
+        except KeyError:
+            raise KeyError("One of the dates is out of range")
+
+    filenames = []
+
+    vmax = 0.5*np.nanmax(MakePredictions.truths[start_idx:end_idx,:])
+
+    if savepath==None:
+        savepath="footprints_"+ start_date.strftime("%H-%d-%m-%Y") + "_" + end_date.strftime("%H-%d-%m-%Y") + ".gif"
+        print("saving as ", savepath )
+
+    # plot each figure and save
+    for t in range(start_idx, end_idx):
+        plot_footprint(MakePredictions, LoadData, t, fixed_cbar=vmax)
+        filename = f'{t}.png'
+        filenames.append(filename)       
+        plt.savefig(filename)
+        plt.close()
+
+    # write gif
+    try:
+        with imageio.get_writer(savepath, mode='I') as writer:
+            for filename in filenames:
+                image = imageio.imread(filename)
+                writer.append_data(image)
+    except Exception as inst:
+        print("Gif could not be saved ", inst)
+    # Remove files
+    for filename in set(filenames):
+        os.remove(filename)
+
+#class EvaluationMetrics()
