@@ -31,10 +31,14 @@ class MakePredictions:
 
     Further functions:
         - predict_fluxes: convolute footprints with fluxes to obtain above-baseline mole fraction in area
+        - plot_flux: plots the above-baseline mole fractions for a particular month
+        - plot_footprint: plots a side-by-side comparison of a footprint at a particular point in time
+        - make_footprint_gif: creates a gif of footprints side-by-side between two dates
     """
     def __init__(self, clfs, data, inputs, jump):
         self.inputs = inputs
         self.clfs = clfs
+        self.data = data
         
         ## set up prediction arrays and other attributes
         self.truths = data.fp_data[jump:-3,:]
@@ -93,174 +97,181 @@ class MakePredictions:
 
 
 
-def plot_flux(MakePredictions, LoadData, month, year=None):
-    """
-    Plot mole fraction from LPDM footprints and emulated footprints for a particular month.
+    def plot_flux(self, month, year=None):
+        """
+        Plot mole fraction from LPDM footprints and emulated footprints for a particular month.
 
-    Takes as inputs a MakePredictions object that has attributes true_flux and pred_flux (ie predict_fluxes has been run),
-    a LoadData object and the month and year to plot, as an integer (January is 1, February 2 etc and 2015, 2016 etc). The year is not necessary if the LoadData object contains only one year.
+        Takes as inputs the month and year to plot, as an integer (January is 1, February 2 etc and 2015, 2016 etc). The year is not necessary if the LoadData object contains only one year. Note that the function predict_fluxes needs to have been run to be able to plut the fluxes.
 
-    """
-    fig, axis = plt.subplots(1,1,figsize = (15,4))
+        """
+        fig, axis = plt.subplots(1,1,figsize = (15,4))
 
-    fontsizes = {"title":17, "labels": 15, "axis":10}
+        fontsizes = {"title":17, "labels": 15, "axis":10}
 
-    if year==None:
-        if type(LoadData.year) == int:
-            year = LoadData.year
+        if year==None:
+            if type(self.data.year) == int:
+                year = self.data.year
+            else:
+                print("No year was passed but the LoadData object comprises more than one year. Please pass a year.")
+
+        month = np.argwhere((pd.DatetimeIndex(self.data.met.time.values[self.jump:-3]).month == month) & (pd.DatetimeIndex(self.data.met.time.values[self.jump:-3]).year == year))
+        assert len(month) > 0, "It seems there is no data in the LoadData object for this month and year."
+        dates = pd.DatetimeIndex(self.data.met.time.values[self.jump:-3][month])
+        month_idxs = [month[0][0],month[-1][0]+1]
+        
+        try:
+            axis.plot(dates, 1e6*self.true_flux[month_idxs[0]:month_idxs[1]], label = "using LPDM-generated footprints", linewidth=2 ,c="#2c6dae")
+            axis.plot(dates, 1e6*self.pred_flux[month_idxs[0]:month_idxs[1]], label = "using emulated footprints", linewidth=2 ,c="#989933")
+        except AttributeError:
+            print("MakePredictions object needs true_flux and pred_flux attributes. Run the predict_fluxes function before plotting.")
+        
+        axis.xaxis.set_major_locator(mdates.WeekdayLocator(byweekday=mdates.WE))
+        axis.xaxis.set_major_formatter(mdates.DateFormatter('%d/%m/%Y'))
+        axis.xaxis.set_minor_locator(mdates.DayLocator(bymonthday=range(1, 32)))
+
+        axis.yaxis.offsetText.set_fontsize(0)
+        
+        axis.set_ylim([0,0.0000001+1e6*np.max([self.pred_flux[month_idxs[0]:month_idxs[1]], self.true_flux[month_idxs[0]:month_idxs[1]]])])
+
+        axis.set_ylabel('Above baseline methane concentration, (micro mol/mol)', fontsize=fontsizes["axis"])
+        axis.set_title('Above baseline methane concentration for ' + self.data.site)
+
+        axis.legend()
+
+        plt.show()
+
+    def plot_footprint(self, date, fixed_cbar = False):
+        """
+        Plot footprints (real and predicted side-by-side).
+
+        Takes as inputs the date to plot (as a string in format hour:00 day/month/year (eg 15:00 1/3/2016) or as an data index as an int).
+        """
+        ## check that date is within range, and get index from date (or viceversa)
+        if type(date) == str:
+            try:
+                date = datetime.strptime(date, "%H:00 %d/%m/%Y")
+            except:
+                print("Something was wrong with the date. Please pass it in format hour:00 day/month/year (eg 15:00 1/3/2016)")
+            
+            try:
+                idx = pd.DatetimeIndex(self.data.met.time.values[self.jump:-3]).get_loc(date)
+            except:
+                raise KeyError("This date is out of range")
+
+        if type(date) == int:
+            idx = date
+            try:
+                date = pd.DatetimeIndex(self.data.met.time.values[self.jump:-3])[idx]
+            except:
+                raise KeyError("This index is out of range")
+
+        ## create figure and plot
+        fig, (axr, axp) = plt.subplots(1,2,figsize = (15,7), subplot_kw={'projection':cartopy.crs.Mercator()})
+
+        if fixed_cbar==False:
+            vmax = np.nanmax(self.truths[idx,:])
         else:
-            print("No year was passed but the LoadData object comprises more than one year. Please pass a year.")
-
-    month = np.argwhere((pd.DatetimeIndex(LoadData.met.time.values[MakePredictions.jump:-3]).month == month) & (pd.DatetimeIndex(LoadData.met.time.values[MakePredictions.jump:-3]).year == year))
-    assert len(month) > 0, "It seems there is no data in the LoadData object for this month and year."
-    dates = pd.DatetimeIndex(LoadData.met.time.values[MakePredictions.jump:-3][month])
-    month_idxs = [month[0][0],month[-1][0]+1]
-    
-    try:
-        axis.plot(dates, 1e6*MakePredictions.true_flux[month_idxs[0]:month_idxs[1]], label = "using LPDM-generated footprints", linewidth=2 ,c="#2c6dae")
-        axis.plot(dates, 1e6*MakePredictions.pred_flux[month_idxs[0]:month_idxs[1]], label = "using emulated footprints", linewidth=2 ,c="#989933")
-    except AttributeError:
-        print("MakePredictions object needs true_flux and pred_flux attributes. Run the predict_fluxes function before plotting.")
-    
-    axis.xaxis.set_major_locator(mdates.WeekdayLocator(byweekday=mdates.WE))
-    axis.xaxis.set_major_formatter(mdates.DateFormatter('%d/%m/%Y'))
-    axis.xaxis.set_minor_locator(mdates.DayLocator(bymonthday=range(1, 32)))
-
-    axis.yaxis.offsetText.set_fontsize(0)
-    
-    axis.set_ylim([0,0.0000001+1e6*np.max([MakePredictions.pred_flux[month_idxs[0]:month_idxs[1]], MakePredictions.true_flux[month_idxs[0]:month_idxs[1]]])])
-
-    axis.set_ylabel('Above baseline methane concentration, (micro mol/mol)', fontsize=fontsizes["axis"])
-    axis.set_title('Above baseline methane concentration for ' + LoadData.site)
-
-    axis.legend()
-
-    plt.show()
-
-def plot_footprint(MakePredictions, LoadData, date, fixed_cbar = False):
-    """
-    Plot footprints (real and predicted side-by-side).
-
-    Takes as inputs a MakePredictions object, a LoadData object and the date to plot (as a string in format hour:00 day/month/year (eg 15:00 1/3/2016) or as an data index as an int).
-    """
-    ## check that date is within range, and get index from date (or viceversa)
-    if type(date) == str:
-        try:
-            date = datetime.strptime(date, "%H:00 %d/%m/%Y")
-        except:
-            print("Something was wrong with the date. Please pass it in format hour:00 day/month/year (eg 15:00 1/3/2016)")
+            vmax = fixed_cbar
         
-        try:
-            idx = pd.DatetimeIndex(LoadData.met.time.values[MakePredictions.jump:-3]).get_loc(date)
-        except:
-            raise KeyError("This date is out of range")
-
-    if type(date) == int:
-        idx = date
-        try:
-            date = pd.DatetimeIndex(LoadData.met.time.values[MakePredictions.jump:-3])[idx]
-        except:
-            raise KeyError("This index is out of range")
-
-    ## create figure and plot
-    fig, (axr, axp) = plt.subplots(1,2,figsize = (15,7), subplot_kw={'projection':cartopy.crs.Mercator()})
-
-    if fixed_cbar==False:
-        vmax = np.nanmax(MakePredictions.truths[idx,:])
-    else:
-        vmax = fixed_cbar
-    
-    axr.pcolormesh(LoadData.fp_lons, LoadData.fp_lats, np.reshape(MakePredictions.truths[idx,:], (10,10)), transform=cartopy.crs.PlateCarree(), cmap="Reds", vmax = vmax, vmin=0)
-    c = axp.pcolormesh(LoadData.fp_lons, LoadData.fp_lats, np.reshape(MakePredictions.predictions[idx,:], (10,10)), transform=cartopy.crs.PlateCarree(), cmap="Reds", vmax = vmax, vmin=0)
+        axr.pcolormesh(self.data.fp_lons, self.data.fp_lats, np.reshape(self.truths[idx,:], (10,10)), transform=cartopy.crs.PlateCarree(), cmap="Reds", vmax = vmax, vmin=0)
+        c = axp.pcolormesh(self.data.fp_lons, self.data.fp_lats, np.reshape(self.predictions[idx,:], (10,10)), transform=cartopy.crs.PlateCarree(), cmap="Reds", vmax = vmax, vmin=0)
 
 
-    ## set up axis
-    for ax in [axr, axp]:
-        ax.set_extent([LoadData.fp_lons[0]-0.1,LoadData.fp_lons[-1]+0.1, LoadData.fp_lats[0]+0.1,LoadData.fp_lats[-1]+0.1], crs=cartopy.crs.PlateCarree())
-        ax.set_xticks(LoadData.fp_lons[::3], crs=cartopy.crs.PlateCarree())
-    
-        lon_formatter = LongitudeFormatter(number_format='.1f', degree_symbol='', dateline_direction_label=True)
-        ax.xaxis.set_major_formatter(lon_formatter)  
-        ax.set_yticks(LoadData.fp_lats[::3], crs=cartopy.crs.PlateCarree())
-        lat_formatter = LatitudeFormatter(number_format='.1f',  degree_symbol='',)
-        ax.yaxis.set_major_formatter(lat_formatter)             
-        ax.tick_params(axis='both', which='major', labelsize=12)   
-
-        ax.plot(LoadData.release_lon+0, LoadData.release_lat+0, marker='o', c="w", markeredgecolor = "k", transform=cartopy.crs.PlateCarree(), markersize=5)
-
-        ax.coastlines(resolution='50m', color='black', linewidth=2)
-
-    
-    axr.set_title("LPDM-generated footprint - "+ LoadData.site + "\n" + date.strftime("%m/%d/%Y, %H:00"), fontsize = 17)
-    axp.set_title("Emulator-generated footprint - "+ LoadData.site + "\n" + date.strftime("%m/%d/%Y, %H:00"), fontsize = 17)
-
-    ## set up cbar
-    cbar = plt.colorbar(c, ax=[axr, axp], orientation="vertical", aspect = 15, pad = 0.02)
-    cbar.ax.tick_params(labelsize=11)
-    cbar.set_label("sensitivity, (mol/mol)/(mol/m2/s)", size = 15, loc="center", labelpad = 16) 
-
-    fig.show()
-
-
-def make_footprint_gif(MakePredictions, LoadData, start_date, end_date, savepath=None):
-    """
-    Make gif of footprints (real and predicted side-by-side) for a range of dates.
-
-    Takes as inputs a MakePredictions object, a LoadData object, the start and end date (as strings in format hour:00 day/month/year (eg 15:00 1/3/2016) or as integers), and an optional saving directory. Otherwise gif is saved in local directory under the name footprints_startdate_enddate.gif.
-
-    """
-    
-    ## check that date is within range, and get index from date (or viceversa)
-    if type(start_date) == str and type(end_date) == str:
-        try:
-            start_date = datetime.strptime(start_date, "%H:00 %d/%m/%Y")
-            end_date = datetime.strptime(end_date, "%H:00 %d/%m/%Y")
-        except:
-            print("Something was wrong with the date. Please pass it in format hour:00 day/month/year (eg 15:00 1/3/2016)")
+        ## set up axis
+        for ax in [axr, axp]:
+            ax.set_extent([self.data.fp_lons[0]-0.1,self.data.fp_lons[-1]+0.1, self.data.fp_lats[0]+0.1,self.data.fp_lats[-1]+0.1], crs=cartopy.crs.PlateCarree())
+            ax.set_xticks(self.data.fp_lons[::3], crs=cartopy.crs.PlateCarree())
         
+            lon_formatter = LongitudeFormatter(number_format='.1f', degree_symbol='', dateline_direction_label=True)
+            ax.xaxis.set_major_formatter(lon_formatter)  
+            ax.set_yticks(self.data.fp_lats[::3], crs=cartopy.crs.PlateCarree())
+            lat_formatter = LatitudeFormatter(number_format='.1f',  degree_symbol='',)
+            ax.yaxis.set_major_formatter(lat_formatter)             
+            ax.tick_params(axis='both', which='major', labelsize=12)   
+
+            ax.plot(self.data.release_lon+0, self.data.release_lat+0, marker='o', c="w", markeredgecolor = "k", transform=cartopy.crs.PlateCarree(), markersize=5)
+
+            ax.coastlines(resolution='50m', color='black', linewidth=2)
+
+        
+        axr.set_title("LPDM-generated footprint - "+ self.data.site + "\n" + date.strftime("%m/%d/%Y, %H:00"), fontsize = 17)
+        axp.set_title("Emulator-generated footprint - "+ self.data.site + "\n" + date.strftime("%m/%d/%Y, %H:00"), fontsize = 17)
+
+        ## set up cbar
+        cbar = plt.colorbar(c, ax=[axr, axp], orientation="vertical", aspect = 15, pad = 0.02)
+        cbar.ax.tick_params(labelsize=11)
+        cbar.set_label("sensitivity, (mol/mol)/(mol/m2/s)", size = 15, loc="center", labelpad = 16) 
+
+        fig.show()
+
+
+    def make_footprint_gif(self, start_date, end_date, savepath=None):
+        """
+        Make gif of footprints (real and predicted side-by-side) for a range of dates.
+
+        Takes as inputs the start and end date (as strings in format hour:00 day/month/year (eg 15:00 1/3/2016) or as integers), and an optional saving directory. Otherwise gif is saved in local directory under the name footprints_startdate_enddate.gif.
+
+        """
+        
+        ## check that date is within range, and get index from date (or viceversa)
+        if type(start_date) == str and type(end_date) == str:
+            try:
+                start_date = datetime.strptime(start_date, "%H:00 %d/%m/%Y")
+                end_date = datetime.strptime(end_date, "%H:00 %d/%m/%Y")
+            except:
+                print("Something was wrong with the date. Please pass it in format hour:00 day/month/year (eg 15:00 1/3/2016)")
+            
+            try:
+                start_idx = pd.DatetimeIndex(self.data.met.time.values[self.jump:-3]).get_loc(start_date)
+                end_idx = pd.DatetimeIndex(self.data.met.time.values[self.jump:-3]).get_loc(end_date)
+            except KeyError:
+                raise KeyError("One of the dates is out of range")
+
+            assert start_idx<end_idx, "Start date should be before end date"
+
+        if type(start_date) == int and type(end_date) == int:
+            start_idx, end_idx = start_date, end_date 
+            assert start_idx<end_idx, "Start date should be before end date"
+            try:
+                start_date = pd.DatetimeIndex(self.data.met.time.values[self.jump:-3])[start_idx]
+                end_date = pd.DatetimeIndex(self.data.met.time.values[self.jump:-3])[end_idx]
+            except KeyError:
+                raise KeyError("One of the dates is out of range")
+
+        filenames = []
+
+        vmax = 0.5*np.nanmax(self.truths[start_idx:end_idx,:])
+
+        if savepath==None:
+            savepath="footprints_"+ start_date.strftime("%H-%d-%m-%Y") + "_" + end_date.strftime("%H-%d-%m-%Y") + ".gif"
+            print("saving as ", savepath )
+
+        # plot each figure and save
+        for t in range(start_idx, end_idx):
+            self.plot_footprint(self, self.data, t, fixed_cbar=vmax)
+            filename = f'{t}.png'
+            filenames.append(filename)       
+            plt.savefig(filename)
+            plt.close()
+
+        # write gif
         try:
-            start_idx = pd.DatetimeIndex(LoadData.met.time.values[MakePredictions.jump:-3]).get_loc(start_date)
-            end_idx = pd.DatetimeIndex(LoadData.met.time.values[MakePredictions.jump:-3]).get_loc(end_date)
-        except KeyError:
-            raise KeyError("One of the dates is out of range")
+            with imageio.get_writer(savepath, mode='I') as writer:
+                for filename in filenames:
+                    image = imageio.imread(filename)
+                    writer.append_data(image)
+        except Exception as inst:
+            print("Gif could not be saved ", inst)
+        # Remove files
+        for filename in set(filenames):
+            os.remove(filename)
 
-        assert start_idx<end_idx, "Start date should be before end date"
+    # class metrics()
+    # NMAE (fp)
+    # above threshold accuracy (fp)
+    # NMAE (flux)
+    # r2 score (flux)
+    # bias (flux)
+    # percentile bias (flux)
 
-    if type(start_date) == int and type(end_date) == int:
-        start_idx, end_idx = start_date, end_date 
-        assert start_idx<end_idx, "Start date should be before end date"
-        try:
-            start_date = pd.DatetimeIndex(LoadData.met.time.values[MakePredictions.jump:-3])[start_idx]
-            end_date = pd.DatetimeIndex(LoadData.met.time.values[MakePredictions.jump:-3])[end_idx]
-        except KeyError:
-            raise KeyError("One of the dates is out of range")
-
-    filenames = []
-
-    vmax = 0.5*np.nanmax(MakePredictions.truths[start_idx:end_idx,:])
-
-    if savepath==None:
-        savepath="footprints_"+ start_date.strftime("%H-%d-%m-%Y") + "_" + end_date.strftime("%H-%d-%m-%Y") + ".gif"
-        print("saving as ", savepath )
-
-    # plot each figure and save
-    for t in range(start_idx, end_idx):
-        plot_footprint(MakePredictions, LoadData, t, fixed_cbar=vmax)
-        filename = f'{t}.png'
-        filenames.append(filename)       
-        plt.savefig(filename)
-        plt.close()
-
-    # write gif
-    try:
-        with imageio.get_writer(savepath, mode='I') as writer:
-            for filename in filenames:
-                image = imageio.imread(filename)
-                writer.append_data(image)
-    except Exception as inst:
-        print("Gif could not be saved ", inst)
-    # Remove files
-    for filename in set(filenames):
-        os.remove(filename)
-
-#class EvaluationMetrics()
+    # feature interpretation
