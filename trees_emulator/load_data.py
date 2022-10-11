@@ -14,11 +14,12 @@ class LoadData:
         - size: size for footprint to be cut to, as an int. Resolution of initial footprint is maintained, cut to a sizexsize square around the release point. 
             Should be even for computational purposes.
         - verbose: if True, prints out the steps throughout the data loading process.
-        - met_datadir: Directory for met data as a string, including wildcards if needed (eg "data/MHD_2016*"). If empty, uses default folder and naming.
-        - extramet_datadir: Directory for extramet data (used for gradients, needs to be preprocessed) as a string, 
-            including wildcards if needed (eg "data/MHD_2016*"). If empty, uses default folder and naming.
-        - fp_datadir: Directory for footprint data as a string, including wildcards if needed (eg "data/MHD_2016*"). If empty, uses default folder and naming.
-
+        - met_datadir: Directory for .nc met data as a string, including wildcards if needed (eg "data/MHD_*"). If empty, uses default folder and naming. 
+        - extramet_datadir: Directory for .nc extramet data (used for gradients, needs to be preprocessed to have some time and space resolution as met) as a string. 
+            including wildcards if needed (eg "data/MHD_*"). If empty, uses default folder and naming.
+        - fp_datadir: Directory for .nc footprint data as a string, including wildcards if needed (eg "data/MHD_*"). If empty, uses default folder and naming.
+        Note for all three directories: If not empty, only appends year (ie need to specify or use wildcards for rest of name, including site or domain) 
+        If passing wildcards from command line, need to do so in quotes.
     outputs:
         LoadData object with attributes:
         - year, site, metheight, size, metsize: details about inputs
@@ -52,6 +53,8 @@ class LoadData:
         
         if met_datadir==None:
             met_datadir = "data/met/"+str(domain[site])+"*"+str(self.metheight)+"*"+str(self.year)+"*.nc"
+        else:
+            met_datadir = met_datadir+str(self.year)+"*.nc"
         if verbose: print("Loading Meteorology data from " + met_datadir)
         self.met = xr.open_mfdataset(sorted(glob.glob(met_datadir)), combine='by_coords')
         
@@ -66,6 +69,8 @@ class LoadData:
         # load footprint (fp) data
         if fp_datadir==None:
             fp_datadir = "data/fps/"+site+"-"+heights[site]+"*"+str(self.year)+"*.nc"
+        else:
+            fp_datadir=fp_datadir+str(self.year)+"*.nc"
         if verbose: print("Loading footprint data from " + fp_datadir) 
         self.fp_data_full = xr.open_mfdataset(sorted(glob.glob(fp_datadir)), combine='by_coords')
 
@@ -98,6 +103,8 @@ class LoadData:
         ### note as data is 3-hourly the last three values cannot be interpolated 
         if extramet_datadir==None:
             extramet_datadir = "data/met/"+str(domain[site])+"*verticalgradients*"+str(self.year)+"*.nc"
+        else:
+            extramet_datadir = extramet_datadir+str(self.year)+"*.nc"
         if verbose: print("Loading extra meteorology from " + extramet_datadir + " and extracting gradients")
         extramet = xr.open_mfdataset(sorted(glob.glob(extramet_datadir)), combine='by_coords')
 
