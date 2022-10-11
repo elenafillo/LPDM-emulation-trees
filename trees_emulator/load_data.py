@@ -32,7 +32,7 @@ class LoadData:
         - y_wind and x_wind: horizontal wind vectors, transformed from input data's wind direction and speed.
 
     """
-    def __init__(self, year, site = "MHD", siteheight = None, metheight = "10magl", size=10, verbose = False,
+    def __init__(self, year, site = "MHD", siteheight = None, metheight = None, size=10, verbose = False,
         met_datadir = None, extramet_datadir = None, fp_datadir = None):
         heights = {"MHD":"10magl", "THD":"10magl", "TAC":"185magl", "RGL":"90magl", "HFD":"100magl", "BSD":"250magl", "GSN":"10magl"} # default heights
         if siteheight != None:
@@ -43,7 +43,10 @@ class LoadData:
         ## TODO remove all mentions of this and fix directly
         self.year = year
         self.site = site
-        self.metheight = metheight
+        if metheight==None:
+            self.metheight = "10magl"
+        else:
+            self.metheight = metheight
 
         ## load met data
         
