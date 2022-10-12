@@ -2,4 +2,4 @@ data/
 .ipynb_checkpoints/
 trees_emulator/__pycache__/
 trained_models/
-trees_emulator/training.py
+run_code.sh
