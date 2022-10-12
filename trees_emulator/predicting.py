@@ -12,6 +12,7 @@ from shapely.errors import ShapelyDeprecationWarning
 warnings.filterwarnings("ignore", category=ShapelyDeprecationWarning) 
 import imageio
 import os
+import sklearn.metrics as metrics
 
 class MakePredictions:
     """
@@ -94,7 +95,6 @@ class MakePredictions:
         self.pred_flux = np.sum(pred_concentration, axis = (1,2))
         
         return self.true_flux, self.pred_flux
-
 
 
     def plot_flux(self, month, year=None):
@@ -248,7 +248,7 @@ class MakePredictions:
 
         # plot each figure and save
         for t in range(start_idx, end_idx):
-            self.plot_footprint(self, self.data, t, fixed_cbar=vmax)
+            self.plot_footprint(t, fixed_cbar=vmax)
             filename = f'{t}.png'
             filenames.append(filename)       
             plt.savefig(filename)
@@ -266,12 +266,73 @@ class MakePredictions:
         for filename in set(filenames):
             os.remove(filename)
 
-    # class metrics()
-    # NMAE (fp)
-    # above threshold accuracy (fp)
-    # NMAE (flux)
-    # r2 score (flux)
-    # bias (flux)
-    # percentile bias (flux)
+
+
+    ### metrics
+
+
+    def NMAE_fp(self):
+        # Returns Normalised Mean Absolute Error for the footprints
+        return (metrics.mean_absolute_error(self.truths, self.predictions)/(np.mean(self.truths)))
+
+    def above_threshold_acc(self, threshold=0):
+        # Returns percentage of cells correctly predicted to be below/above a threshold
+        mask = self.truths > threshold
+        mask_pred = self.predictions > threshold       
+        return 100*np.sum(mask == mask_pred)/(np.shape(mask)[0]*np.shape(mask)[1])
+
+    def NMAE_flux(self):
+        # Returns Normalised Mean Absolute Error for the flux
+        try:
+            NMAE = metrics.mean_absolute_error(self.true_flux, self.pred_flux)/(np.mean(self.true_flux))
+        except AttributeError:
+            print("Flux metrics need true_flux and pred_flux attributes. Run the predict_fluxes function before evaluating.")
+        return NMAE
+
+
+    def R_squared(self):
+        # Returns R2 score for the flux
+        try:
+            R2 = metrics.r2_score(self.true_flux, self.pred_flux)
+        except AttributeError:
+            print("Flux metrics need true_flux and pred_flux attributes. Run the predict_fluxes function before evaluating.")
+        return R2
+
+    def bias(self):
+        # Returns Mean Bias Error
+        try:
+            bias = np.mean(self.pred_flux - self.true_flux)
+        except AttributeError:
+            print("Flux metrics need true_flux and pred_flux attributes. Run the predict_fluxes function before evaluating.")
+
+        return bias
+    
+    def plot_bias(self, quantiles=10):
+        # Plots the bias for the flux when divided into q quantiles
+        try:
+            bias = []
+            qs = [np.quantile(self.pred_flux, n) for n in np.linspace(0, 1, quantiles+1)]
+            for q in range(len(qs)-1):
+                mask = np.bitwise_and(self.true_flux>qs[q], self.true_flux<qs[q+1])
+                bias.append(np.mean(self.pred_flux[mask]-self.true_flux[mask]))    
+        except AttributeError:
+            print("Flux metrics need true_flux and pred_flux attributes. Run the predict_fluxes function before evaluating.")
+
+        fig, ax = plt.subplots(1,1,figsize = (6,4))
+        ax.set_title("Bias across quantiles for " + self.data.site, fontsize=10)
+        ax.plot(np.array(bias)*1e6, c = "#222255") 
+        ax.set_ylabel("MBE, (micro mol/mol)", fontsize=9) 
+        ax.set_xlabel(f"{quantiles}-Quantile", fontsize=9) 
+        ax.axhline(0, c = "grey", alpha = 0.8)
+
+        if quantiles < 6:
+            ticks = np.linspace(0, 1, quantiles+1)[:-1]
+            names = [f"{n}th" for n in np.arange(quantiles)+1 ]
+            print(ticks)
+            ax.set_xticks(ticks*quantiles, names)
+        else:
+            ticks = np.linspace(0, 1, quantiles+1)[:-1][::2]
+            names = [f"{n}th" for n in np.arange(quantiles)+1 ][::2]
+            ax.set_xticks(ticks*quantiles, names)
 
     # feature interpretation
