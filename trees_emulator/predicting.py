@@ -13,6 +13,7 @@ warnings.filterwarnings("ignore", category=ShapelyDeprecationWarning)
 import imageio
 import os
 import sklearn.metrics as metrics
+import xarray as xr
 
 class MakePredictions:
     """
@@ -31,6 +32,7 @@ class MakePredictions:
         - inputs, clfs, size, metsize, jump: parameters and info from inputs
 
     Further functions:
+        - save_predictions: save emulated footprints as a .nc file
         - predict_fluxes: convolute footprints with fluxes to obtain above-baseline mole fraction in area
         - plot_flux: plots the above-baseline mole fractions for a particular month
         - plot_footprint: plots a side-by-side comparison of a footprint at a particular point in time
@@ -78,6 +80,45 @@ class MakePredictions:
         
         self.predictions[self.predictions < 0] = 0 
 
+    def save_predictions(self, info, save_dir=None, year=None):
+        """
+        save emulated footprints as a .nc file
+
+        Takes as inputs the trained model info dict, a year as an int (if the LoadData object contains more than year) and the directory and name format to save the footprints. The year, month and extension (.nc) will be added when saving (so pass save_dir in format "/path/to/folder/footprint_format_name")
+
+        """
+        if save_dir == None:
+            save_dir = "data/emulated_fps/"+self.data.site+"_"
+
+        if year==None:
+            if type(self.data.year) == int:
+                year = self.data.year
+            else:
+                print("No year was passed but the LoadData object comprises more than one year. Please pass a year.")
+        assert type(year) == int, "Year should be an integer"
+
+
+        months = np.unique(pd.DatetimeIndex(self.data.met.time.values[self.jump:-3][(pd.DatetimeIndex(self.data.met.time.values[self.jump:-3]).year == year) ]).month) 
+        for m in months:
+            month = np.argwhere((pd.DatetimeIndex(self.data.met.time.values[self.jump:-3]).month == m) & (pd.DatetimeIndex(self.data.met.time.values[self.jump:-3]).year == year)).flatten()
+
+            to_save = np.reshape(self.predictions[month, :], (len(month), self.size, self.size))
+            to_save = np.transpose(to_save, [1,2,0])
+            data_var = {'fp':(['lat', 'lon', 'time'], to_save, self.data.fp_data_full.fp.attrs)}
+            coords = {'lat':(['lat'], self.data.fp_lats), 'lon':(['lon'], self.data.fp_lons), 'time':(['time'], self.data.met.time.values[self.jump:-3][month])}
+            attrs = {'emulated_with':'footprints_emulator at https://github.com/elenafillo/LPDM-emulation-trees', 'emulation_date': str(datetime.now()), 'original_fp_attrs': str(self.data.fp_data_full.attrs), 'emulator_info': str(info), 'regressor_params' : str(self.clfs[0].get_params())} 
+
+            monthly_fp = xr.Dataset(data_vars=data_var, coords=coords, attrs=attrs)
+
+            save_path = save_dir + str(year) + "{:02d}.nc".format(m)
+
+            monthly_fp.to_netcdf(save_path)
+
+
+
+
+
+
     def predict_fluxes(self, flux, units_transform = "default"):
         ## convolute predicted footprints and fluxes, returns two np arrays, one with the true flux and one with the emulated flux, of shape (n_footprints,)
         ## flux is an array, regridded and cut to the same resolution and size of the footprints
@@ -101,7 +142,7 @@ class MakePredictions:
         """
         Plot mole fraction from LPDM footprints and emulated footprints for a particular month.
 
-        Takes as inputs the month and year to plot, as an integer (January is 1, February 2 etc and 2015, 2016 etc). The year is not necessary if the LoadData object contains only one year. Note that the function predict_fluxes needs to have been run to be able to plut the fluxes.
+        Takes as inputs the month to plot (and year if data has more than one year), as an integer (January is 1, February 2 etc and 2015, 2016 etc). The year is not necessary if the LoadData object contains only one year. Note that the function predict_fluxes needs to have been run to be able to plut the fluxes.
 
         """
         fig, axis = plt.subplots(1,1,figsize = (15,4))
