@@ -10,6 +10,25 @@ This code requires Python 3 to run. The easiest way to get the right packages in
 3. Activate the environment: conda activate trees_emulator
 
 ## Data
+This is the default folder structure for the data, which will be used if no directories are passed to LoadData
+
+        /data
+            /fps
+               site-siteheight*yearmonth.nc (eg MHD-10magl*201603.nc)
+           /met
+              domain_Met_metheight_yearmonth.nc (eg EUROPE_Met_10magl_201603.nc)
+              domain_verticalgradients_yearmonth.nc (eg EUROPE_verticalgradients_201603.nc)
+           /fluxes
+              regridded_fluxes.nc (no naming default)
+           /trained_models
+              site.txt (eg MHD.txt, this is the default saving name)
+           /emulated_fps
+              site_yearmonth.nc (eg MHD_201603.nc, this is the default saving name)    
+           
+              
+              
+           
+               
 
 ## Scripts
 
