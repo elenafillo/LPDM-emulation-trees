@@ -33,14 +33,26 @@ class LoadData:
         - y_wind and x_wind: horizontal wind vectors, transformed from input data's wind direction and speed.
 
     """
-    def __init__(self, year, site = "MHD", siteheight = None, metheight = None, size=10, verbose = False,
+    def __init__(self, year, site = "MHD", domain=None, siteheight = None, metheight = None, size=10, verbose = False,
         met_datadir = None, extramet_datadir = None, fp_datadir = None):
         heights = {"MHD":"10magl", "THD":"10magl", "TAC":"185magl", "RGL":"90magl", "HFD":"100magl", "BSD":"250magl", "GSN":"10magl"} # default heights
         if siteheight != None:
             heights[site] = siteheight
         if siteheight == None:
             assert site in heights, "There is no default height for this site. Pass siteheight input (as a string of numbers)"
-        domain = {"MHD":"EUROPE", "THD":"USA", "TAC":"EUROPE", "RGL":"EUROPE", "HFD":"EUROPE", "BSD":"EUROPE", "GSN":"EASTASIA"}
+        
+        if domain==None:
+            domains = {"MHD":"EUROPE", "THD":"USA", "TAC":"EUROPE", "RGL":"EUROPE", "HFD":"EUROPE", "BSD":"EUROPE", "GSN":"EASTASIA"}
+            try:
+                domain = domains[site]   
+            except: 
+                print("No domain was passed and there is no default domain for this site.")
+                if met_datadir != None and extramet_datadir != None: 
+                    print("Domain is not needed because met_datadir and extramet_datadir were passed")
+                else:    
+                    print("If domain is not passed custom paths for met_datadir and extramet_datadir should be passed.")
+                    domain=""
+                   
         ## TODO remove all mentions of this and fix directly
         self.year = year
         self.site = site
@@ -52,7 +64,7 @@ class LoadData:
         ## load met data
         
         if met_datadir==None:
-            met_datadir = "data/met/"+str(domain[site])+"*"+str(self.metheight)+"*"+str(self.year)+"*.nc"
+            met_datadir = "data/met/"+str(domain)+"*"+str(self.metheight)+"*"+str(self.year)+"*.nc"
         else:
             met_datadir = met_datadir+str(self.year)+"*.nc"
         if verbose: print("Loading Meteorology data from " + met_datadir)
@@ -102,7 +114,7 @@ class LoadData:
         ### note that the extra meteorology has been preprocessed, with two levels selected and time/space interpolated
         ### note as data is 3-hourly the last three values cannot be interpolated 
         if extramet_datadir==None:
-            extramet_datadir = "data/met/"+str(domain[site])+"*verticalgradients*"+str(self.year)+"*.nc"
+            extramet_datadir = "data/met/"+str(domain)+"*verticalgradients*"+str(self.year)+"*.nc"
         else:
             extramet_datadir = extramet_datadir+str(self.year)+"*.nc"
         if verbose: print("Loading extra meteorology from " + extramet_datadir + " and extracting gradients")

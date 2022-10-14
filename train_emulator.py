@@ -10,7 +10,7 @@ parser.add_argument('site', type=str,  help='Site to train on, as string (eg "MH
 parser.add_argument('year', help='Time period to train on. Can be int (2016) or str ("201[4-5]")')
 parser.add_argument('--freq', type=int, nargs='?', default=2, help='Sampling frequency for training data as int (eg freq of 2 means one every 2 fps will be used in training)')
 parser.add_argument('--size', type=int, nargs='?', default=10, help='Size of domain to be predicted as int. Default is 10')
-parser.add_argument('--hours_back', nargs='?',type=int, default=2, help='Hours back for inputs that are passed at present and in past as int. Default is 2')
+parser.add_argument('--hours_back', nargs='?',type=int, default=6, help='Hours back for inputs that are passed at present and in past as int. Default is 2')
 
 
 parser.add_argument('--siteheight', nargs='?',default=None,  help='Footprints height')
