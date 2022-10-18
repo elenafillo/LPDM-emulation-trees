@@ -1,6 +1,7 @@
 import numpy as np
 import xarray as xr
 import glob
+import dask
 
 class LoadData:
     """
@@ -118,11 +119,13 @@ class LoadData:
         else:
             extramet_datadir = extramet_datadir+str(self.year)+"*.nc"
         if verbose: print("Loading extra meteorology from " + extramet_datadir + " and extracting gradients")
-        extramet = xr.open_mfdataset(sorted(glob.glob(extramet_datadir)), combine='by_coords')
 
-        extramet = extramet.sel(latitude = self.met.lat.values, longitude = self.met.lon.values, method="nearest")
-        extramet = extramet.interp(time = self.met.time.values)        
-        extramet = extramet.interpolate_na()
+        with dask.config.set(**{'array.slicing.split_large_chunks': True}):
+            extramet = xr.open_mfdataset(sorted(glob.glob(extramet_datadir)), combine='by_coords')
+
+            extramet = extramet.sel(latitude = self.met.lat.values, longitude = self.met.lon.values, method="nearest")
+            extramet = extramet.interp(time = self.met.time.values)        
+            extramet = extramet.interpolate_na()
 
         ## save the tree gradients as a flattened np array (n_samples, size**2)
         self.temp_grad = extramet.air_temperature.sel(model_level_number=4) - extramet.air_temperature.sel(model_level_number=1)
