@@ -2,6 +2,11 @@ import numpy as np
 from sklearn.ensemble import GradientBoostingRegressor
 
 def train_tree(data, inputs, frequency, hours_back, tree):
+    """
+    Train a GBRT (ie the regressor for a single cell) using parameters provided. Returns a trained sklearn regressor
+
+    Parallel predicting function is predict_tree. Edit/replace both of these for custom training/predicting 
+    """
 
     sizediff = int((data.metsize-data.size)/2)
     centre = int(data.size/2)

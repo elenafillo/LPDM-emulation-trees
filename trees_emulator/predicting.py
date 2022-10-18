@@ -58,27 +58,9 @@ class MakePredictions:
         around_measurement_indeces = [(centre+sizediff,j+centre+sizediff) for j in [0,-1,1]] + [(j + centre+sizediff, centre+sizediff) for j in [-1,1]] + [(i+centre+sizediff, j+centre+sizediff) for (i,j) in [(-1,-1), (+1,+1), (+1,-1), (-1,+1)]]
                 
         ## for each regressor, set up indeces, predict and store
-        for n in range(len(clfs)):
-            # find 2D coordinates from flattened tree number
-            (x,y) = np.unravel_index(n, (self.size,self.size))
-            xtree, ytree = x + sizediff,  y + sizediff
-            around_tree_indeces = []
-            for i in [-2,0,+2]:
-                for j in [-2,0,+2]:
-                    around_tree_indeces.append((xtree+i, ytree+j))
-                
-            indeces = around_measurement_indeces + around_tree_indeces
-
-            ## find flattened indeces from 2D coordinates for a single input (ie indices to keep in a metsize x metsize grid)
-            idx_list_tree =  [np.ravel_multi_index([x,y], (self.metsize, self.metsize)) for (x,y) in indeces]
-            ## repeat indeces for each of the concatenated inputs
-            idxs = [i + (self.metsize**2)*n for n in range(int(np.shape(self.inputs)[1]/(self.metsize**2))) for i in idx_list_tree]
-
-            ## select inputs and predict
-            inputs_here = self.inputs[:, idxs]
-            self.predictions[:,n] = self.clfs[n].predict(inputs_here)
+        for tree in range(len(clfs)):
+            self.predictions[:,tree] = predict_tree(self.clfs[tree], self.data, self.inputs, tree, return_truths=False)
         
-        self.predictions[self.predictions < 0] = 0 
 
     def save_predictions(self, info, save_dir=None, year=None):
         """
@@ -113,9 +95,6 @@ class MakePredictions:
             save_path = save_dir + str(year) + "{:02d}.nc".format(m)
 
             monthly_fp.to_netcdf(save_path)
-
-
-
 
 
 
@@ -308,7 +287,6 @@ class MakePredictions:
             os.remove(filename)
 
 
-
     ### metrics
 
 
@@ -376,4 +354,46 @@ class MakePredictions:
             names = [f"{n}th" for n in np.arange(quantiles)+1 ][::2]
             ax.set_xticks(ticks*quantiles, names)
 
-    # feature interpretation
+
+
+def predict_tree(clf, data, inputs, tree, hours_back=None, return_truths=False):
+    """
+    Predict output for a single trained GBRT (ie the regressor for a single cell) using parameters provided. Returns prediction. Parallel function to train_tree
+    
+    """
+
+    sizediff = int((data.metsize-data.size)/2)
+    centre = int(data.size/2)
+
+    (x,y) = np.unravel_index(tree, (data.size,data.size))
+    xtree, ytree = x + sizediff,  y + sizediff
+    around_tree_indeces = []
+    for i in [-2,0,+2]:
+        for j in [-2,0,+2]:
+            around_tree_indeces.append((xtree+i, ytree+j))
+
+    # fixed indices (same for every tree)
+    around_measurement_indeces = [(centre+sizediff,j+centre+sizediff) for j in [0,-1,1]] + [(j + centre+sizediff, centre+sizediff) for j in [-1,1]] + [(i+centre+sizediff, j+centre+sizediff) for (i,j) in [(-1,-1), (+1,+1), (+1,-1), (-1,+1)]]
+
+
+    indeces = around_measurement_indeces + around_tree_indeces
+
+    ## find flattened indeces from 2D coordinates for a single input (ie indices to keep in a metsize x metsize grid)
+    idx_list_tree =  [np.ravel_multi_index([x,y], (data.metsize, data.metsize)) for (x,y) in indeces]
+
+    ## repeat indeces for each of the concatenated inputs
+    idxs = [i + (data.metsize**2)*n for n in range(int(np.shape(inputs)[1]/(data.metsize**2))) for i in idx_list_tree]
+
+    ## select inputs
+    inputs_here = inputs[:, idxs]
+
+    predictions = clf.predict(inputs_here)
+
+    predictions[predictions < 0] = 0 
+
+    if not return_truths:
+        return predictions
+    if return_truths:
+        assert hours_back != None, print("If returning truths, please pass hours_back parameter")
+        truths = data.fp_data[hours_back:-3, tree]  
+        return truths, predictions
