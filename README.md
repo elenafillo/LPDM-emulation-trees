@@ -1,3 +1,5 @@
+[![DOI](https://zenodo.org/badge/544883755.svg)](https://zenodo.org/badge/latestdoi/544883755)
+
 # LPDM-emulation-trees
 This repository contains the scripts required to reproduce the results presented in "A machine learning emulator for Lagrangian particle dispersion model footprints: A case study using NAME" by Elena Fillola, Raul Santos-Rodriguez, Alistair Manning, Simon O'Doherty and Matt Rigby.
 
