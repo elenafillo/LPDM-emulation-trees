@@ -10,7 +10,7 @@ This code requires Python 3 to run. The easiest way to get the right packages in
 3. Activate the environment: conda activate trees_emulator
 
 ## Data
-You can download the sample data accompanying this code from https://doi.org/10.5281/zenodo.7254330. To use with the code, just download and unzip the data.zip in the repository folder. This file follows the default folder structure:
+You can download the sample data accompanying this code from https://doi.org/10.5281/zenodo.7254330 . To use with the code, just download and unzip the data.zip in the repository folder. This file follows the default folder structure:
 
         /data
             /fps
