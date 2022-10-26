@@ -1,5 +1,0 @@
-data/
-.ipynb_checkpoints/
-trees_emulator/__pycache__/
-trained_models/
-run_code.sh
