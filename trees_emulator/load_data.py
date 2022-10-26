@@ -3,6 +3,13 @@ import xarray as xr
 import glob
 import dask
 
+"""
+Reproducible code for "A machine learning emulator for Lagrangian particle dispersion model footprints: A case study using NAME" 
+by Elena Fillola, Raul Santos-Rodriguez, Alistair Manning, Simon O'Doherty and Matt Rigby (2022)
+
+Author: Elena Fillola (elena.fillolamayoral@bristol.ac.uk)
+"""
+
 class LoadData:
     """
     Load data for training and testing, for a particular site

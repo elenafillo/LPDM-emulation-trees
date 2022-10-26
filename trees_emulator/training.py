@@ -1,10 +1,25 @@
 import numpy as np
 from sklearn.ensemble import GradientBoostingRegressor
 
+"""
+Reproducible code for "A machine learning emulator for Lagrangian particle dispersion model footprints: A case study using NAME" 
+by Elena Fillola, Raul Santos-Rodriguez, Alistair Manning, Simon O'Doherty and Matt Rigby (2022)
+
+Author: Elena Fillola (elena.fillolamayoral@bristol.ac.uk)
+"""
+
 def train_tree(data, inputs, frequency, hours_back, tree):
     """
-    Train a GBRT (ie the regressor for a single cell) using parameters provided. Returns a trained sklearn regressor
-
+    Train a GBRT (ie the regressor for a single cell) using parameters provided following method from paper. 
+    Returns a trained sklearn regressor
+    
+    Requires inputs:
+    - data (LoadData object)
+    - inputs (meteorological inputs)
+    - frequency (freq to sample footprints)
+    - hours_back (same parameter as used to produce inputs)
+    - tree (int ID of cell to train, if all cells are flattened. tree is then unraveled into x,y coordinates within the domain, eg tree 0 is at loc 0,0)
+    
     Parallel predicting function is predict_tree. Edit/replace both of these for custom training/predicting 
     """
 

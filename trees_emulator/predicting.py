@@ -15,6 +15,14 @@ import os
 import sklearn.metrics as metrics
 import xarray as xr
 
+"""
+Reproducible code for "A machine learning emulator for Lagrangian particle dispersion model footprints: A case study using NAME" 
+by Elena Fillola, Raul Santos-Rodriguez, Alistair Manning, Simon O'Doherty and Matt Rigby (2022)
+
+Author: Elena Fillola (elena.fillolamayoral@bristol.ac.uk)
+"""
+
+
 class MakePredictions:
     """
     Make footprint predictions
@@ -99,9 +107,12 @@ class MakePredictions:
 
 
     def predict_fluxes(self, flux, units_transform = "default"):
-        ## convolute predicted footprints and fluxes, returns two np arrays, one with the true flux and one with the emulated flux, of shape (n_footprints,)
-        ## flux is an array, regridded and cut to the same resolution and size of the footprints
-        ## units_transform can be None (use fluxes directly), "default" (performs flux*1e3 / CH4molarmass) or another function (which should return an array of the same shape as the original flux)
+        """
+        convolute predicted footprints and fluxes.
+        Returns two np arrays, one with the true flux and one with the emulated flux, both of shape (n_footprints,)
+        input flux should be an array, regridded and cut to the same resolution and size of the footprints
+        units_transform can be None (use fluxes directly), "default" (performs flux*1e3 / CH4molarmass) or another function (which should return an array of the same shape as the original flux)
+        """
         shape = self.size 
         if units_transform != None:
             if units_transform == "default":

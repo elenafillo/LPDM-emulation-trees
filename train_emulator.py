@@ -5,6 +5,13 @@ import pickle
 
 import argparse
 
+"""
+Reproducible code for "A machine learning emulator for Lagrangian particle dispersion model footprints: A case study using NAME" 
+by Elena Fillola, Raul Santos-Rodriguez, Alistair Manning, Simon O'Doherty and Matt Rigby (2022)
+
+Author: Elena Fillola (elena.fillolamayoral@bristol.ac.uk)
+"""
+
 parser = argparse.ArgumentParser(prog = "tree_emulator", description='Train footprint emulator')
 parser.add_argument('site', type=str,  help='Site to train on, as string (eg "MHD")')
 parser.add_argument('year', help='Time period to train on. Can be int (2016) or str ("201[4-5]")')
@@ -60,5 +67,4 @@ with open(save_dir, 'wb') as f:
     pickle.dump([info, clfs], f)
 
     
-
 
