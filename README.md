@@ -1,5 +1,5 @@
 # LPDM-emulation-trees
-[In progress] This repository contains the scripts required to reproduce the results presented in "A machine learning emulator for Lagrangian particle dispersion model footprints"
+This repository contains the scripts required to reproduce the results presented in "A machine learning emulator for Lagrangian particle dispersion model footprints: A case study using NAME"
 
 
 ## Requirements and Creating the Conda Environment
@@ -33,13 +33,13 @@ This is the default folder structure for the data, which will be used if no dire
 ## Scripts
 
 ### Training
-A new emulator can be trained using the train_emulator.py script. You can train the emulator using the default parameters and default data folders, and specifying only the site code (for example, Mace Head is MHD) and year(s) to train on, for example 2014 if a single year or 201[4-5] if multiple.
+A new emulator can be trained using the train_emulator.py script. You can train the emulator using the default parameters and default data folders, and specifying only the site code (e.g. Mace Head is MHD) and year(s) to train on (e.g. 2014 if a single year or 201[4-5] if multiple).
 
         python train_emulator.py MHD 201[4-5]
         
 If you want to use specific folders or parameters, you can specify them, for example:
 
-        python train_emulator.py MHD 201[4-5] --freq 3 --size 16 --met_datadir "/path/to/folder/met_file_format*.nc" --fp_datadir "/path/to/folder/fp_file_format*.nc" --extramet_datadir "/path/to/folder/gradients_file_format*.nc" --save_dir "path/to/save/folder/trained_emulator.txt"
+        python train_emulator.py MHD 201[4-5] --freq 3 --size 16 --met_datadir "/path/to/folder/met_file_format*" --fp_datadir "/path/to/folder/fp_file_format*" --extramet_datadir "/path/to/folder/gradients_file_format*" --save_dir "path/to/save/folder/trained_emulator.txt"
         
 where freq is the sampling frequency of the inputs (eg --freq 3 means one in every three footprints is used for training, default is 2) and size is the size the domain will be cut to (default is 10), and met_datadir, fp_datadir and extramet_datadir are the folders where the three types of data are found. save_dir is the folder and name under which you would like to save your trained model, it should end with ".txt". Note that loading training data for multiple years can use a lot of memory.
 
@@ -48,4 +48,4 @@ The process to predict new and evaluate footprints is outlined in the guide.ipyn
  ![prediction examples](footprints_00-07-04-2016_00-17-04-2016.gif)
  
  ### Custom training/predicting functions
-The scripts here implement the algorithm described in the paper, allowing some flexibility (eg different sampling frequency or size than described). Users can create new training/predicting functions to for example use different sets of inputs or different regressors. To create a new training function, write a function trees_emulator/training.py imitating the default function (train_tree) and replace the default function call with the custom function in train_emulator. Similarly, to predict, create a function imitating the default function (predict_tree) and replace the default function call with the custom function in the object MakePredictions.
+The scripts here implement the algorithm described in the paper, allowing some flexibility (eg different sampling frequency or size than described). Users can create new training/predicting functions to for example use different sets of inputs or different regressors. To create a new training function, write a function in trees_emulator/training.py imitating the default function (train_tree) and replace the default function call with the custom function in train_emulator. Similarly, to predict, create a function imitating the default function (predict_tree) and replace the default function call with the custom function in the object MakePredictions.
